@@ -2,13 +2,14 @@
  * Spec known-answer tests for every primitive the demo relies on:
  *  - HKDF-SHA-256: RFC 5869 Appendix A, test cases 1-3 (the SHA-256 cases)
  *  - HMAC-SHA-256: RFC 4231, test cases 1-2
+ *  - SHA-256: FIPS 180 "abc" vector
  *  - AES-256-GCM: NIST GCM spec (McGrew-Viega revised spec), test cases 13-16
- * 9 KATs total.
+ * 10 KATs total.
  */
 
 import { describe, expect, it } from 'vitest'
 import { fromHex, toHex, utf8 } from './bytes'
-import { aesGcmOpen, aesGcmSealWithIv, hkdfSha256, hmacSha256 } from './primitives'
+import { aesGcmOpen, aesGcmSealWithIv, hkdfSha256, hmacSha256, sha256 } from './primitives'
 
 describe('HKDF-SHA-256 — RFC 5869 Appendix A', () => {
   it('test case 1 (basic)', async () => {
@@ -69,6 +70,14 @@ describe('HMAC-SHA-256 — RFC 4231', () => {
   it('test case 2', async () => {
     const mac = await hmacSha256(utf8('Jefe'), utf8('what do ya want for nothing?'))
     expect(toHex(mac)).toBe('5bdcc146bf60754e6a042426089575c75a003f089d2739839dec58b964ec3843')
+  })
+})
+
+describe('SHA-256 — FIPS 180', () => {
+  it('digest of "abc"', async () => {
+    expect(toHex(await sha256(utf8('abc')))).toBe(
+      'ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad',
+    )
   })
 })
 

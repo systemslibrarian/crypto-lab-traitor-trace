@@ -5,6 +5,8 @@
  * Leaves are nodes 16..31; subscriber u (0..15) sits at leaf node 16+u.
  */
 
+// [extension] point: N is the single knob for a deeper tree; the crypto core
+// is N-generic, only the UI layout assumes 16.
 export const N = 16 // number of subscribers / leaves
 export const ROOT = 1
 export const TREE_DEPTH = 4 // log2(N)

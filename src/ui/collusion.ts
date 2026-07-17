@@ -10,6 +10,7 @@ import { makeProbe, pirateDecode, traceTraitor, makeXorshift, type Strategy } fr
 import { N } from '../core/tree'
 import { el, resultLine, subLabel, verdictCard, clear } from './dom'
 import type { Lab } from './lab'
+import { scenarioGet, scenarioSet } from './scenario'
 
 export async function initCollusionPanel(lab: Lab, mount: HTMLElement): Promise<void> {
   let busy = false
@@ -47,9 +48,25 @@ export async function initCollusionPanel(lab: Lab, mount: HTMLElement): Promise<
   }
 
   // --- part 2: the tracing limit ---------------------------------------
-  const selA = makeSelect('collusion-a', 3)
-  const selB = makeSelect('collusion-b', 12)
-  let strategy: Strategy = 'evasive'
+  const urlSub = (key: string, fallback: number): number => {
+    const v = Number.parseInt(scenarioGet(key) ?? '', 10) - 1
+    return v >= 0 && v < N ? v : fallback
+  }
+  const selA = makeSelect('collusion-a', urlSub('ca', 3))
+  const selB = makeSelect('collusion-b', urlSub('cb', 12))
+  let strategy: Strategy = scenarioGet('st') === 'greedy' ? 'greedy' : 'evasive'
+
+  // Seeded PRNG makes every histogram reproducible from its scenario link.
+  const urlSeed = Number.parseInt(scenarioGet('seed') ?? '', 10)
+  const seedInput = el('input', {
+    type: 'text',
+    id: 'collusion-seed',
+    class: 'seed-input',
+    inputmode: 'numeric',
+  }) as HTMLInputElement
+  seedInput.value = String(
+    Number.isInteger(urlSeed) && urlSeed > 0 ? urlSeed : 1 + (crypto.getRandomValues(new Uint32Array(1))[0] % 999_999),
+  )
   const stratSet = el('fieldset', {}, [el('legend', { text: 'Decoder strategy' })])
   for (const [value, label] of [
     ['greedy', 'always decrypts when it can'],
@@ -145,14 +162,25 @@ export async function initCollusionPanel(lab: Lab, mount: HTMLElement): Promise<
     busy = true
     runBtn.disabled = true
     try {
+      const seedBase = Number.parseInt(seedInput.value, 10) || 1
+      seedInput.value = String(seedBase)
+      scenarioSet({
+        ca: String(a + 1),
+        cb: String(b + 1),
+        st: strategy,
+        seed: String(seedBase),
+      })
       const decoder = { rings: [lab.rings[a], lab.rings[b]] }
-      const seedBytes = new Uint32Array(1)
       const counts = new Array<number>(N).fill(0)
       const RUNS = 25
-      for (let run = 0; run < RUNS; run++) {
-        crypto.getRandomValues(seedBytes)
-        const coin = makeXorshift(seedBytes[0])
-        const result = await traceTraitor(lab.master, decoder, strategy, coin)
+      // Runs are independent (one seeded coin each), so they race in parallel.
+      const results = await Promise.all(
+        Array.from({ length: RUNS }, (_, run) => {
+          const coin = makeXorshift((seedBase ^ Math.imul(run + 1, 0x9e3779b9)) >>> 0)
+          return traceTraitor(lab.master, decoder, strategy, coin)
+        }),
+      )
+      for (const result of results) {
         if (result.accused !== null) counts[result.accused]++
       }
       clear(histBox)
@@ -171,11 +199,17 @@ export async function initCollusionPanel(lab: Lab, mount: HTMLElement): Promise<
         histBox.append(row)
       })
       clear(summaryBox)
+      const seedLine = resultLine(
+        'Reproducibility',
+        'neutral',
+        `seed ${seedBase} — “Copy scenario link” reproduces this exact histogram`,
+      )
       if (innocentHits > 0) {
         summaryBox.append(
           verdictCard('alarm', [
             resultLine('Tracer output', 'neutral', `accusations landed on ${counts.filter((c) => c > 0).length} different subscribers across ${RUNS} runs`),
             resultLine('Security verdict', 'alarm', `FALSE ACCUSATION — ${innocentHits} of ${RUNS} runs blamed a subscriber whose keys are NOT in the box. Past its collusion guarantee, this tracer doesn't just miss traitors; it can frame the innocent.`),
+            seedLine,
           ]),
         )
       } else {
@@ -183,6 +217,7 @@ export async function initCollusionPanel(lab: Lab, mount: HTMLElement): Promise<
           verdictCard('ok', [
             resultLine('Tracer output', 'neutral', `every accusation named ${counts[b] > 0 && counts[a] > 0 ? 'a coalition member' : subLabel(counts[a] > 0 ? a : b)}`),
             resultLine('Security verdict', 'ok', 'within the guarantee: a box that always decrypts when it can — even with pooled keys — always surrenders a real traitor'),
+            seedLine,
           ]),
         )
       }
@@ -203,6 +238,8 @@ export async function initCollusionPanel(lab: Lab, mount: HTMLElement): Promise<
       el('label', { for: 'collusion-b', text: 'Traitor 2:' }),
       selB,
       stratSet,
+      el('label', { for: 'collusion-seed', text: 'Seed:' }),
+      seedInput,
       peekBtn,
       runBtn,
     ]),

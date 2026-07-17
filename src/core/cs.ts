@@ -15,9 +15,23 @@ import { isLeaf, leafNode, left, N, pathToRoot, right, ROOT } from './tree'
 
 const NO_SALT = new Uint8Array(0)
 
+// Node-key memo per master seed (probes re-derive all 16 leaf keys; this
+// turns those repeat HKDF calls into map hits — same bytes, same crypto).
+const nodeKeyCache = new WeakMap<Uint8Array, Map<number, Promise<Uint8Array>>>()
+
 /** Center-side key for one tree node. */
-export async function csNodeKey(master: Uint8Array, node: number): Promise<Uint8Array> {
-  return hkdfSha256(master, NO_SALT, utf8(`crypto-lab-traitor-trace/cs-node/${node}`), 32)
+export function csNodeKey(master: Uint8Array, node: number): Promise<Uint8Array> {
+  let perMaster = nodeKeyCache.get(master)
+  if (!perMaster) {
+    perMaster = new Map()
+    nodeKeyCache.set(master, perMaster)
+  }
+  let key = perMaster.get(node)
+  if (!key) {
+    key = hkdfSha256(master, NO_SALT, utf8(`crypto-lab-traitor-trace/cs-node/${node}`), 32)
+    perMaster.set(node, key)
+  }
+  return key
 }
 
 /** The key material subscriber u walks away from setup with: its path keys. */

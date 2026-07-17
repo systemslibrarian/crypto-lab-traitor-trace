@@ -14,6 +14,7 @@ import {
 import { N } from '../core/tree'
 import { el, pause, resultLine, subLabel, verdictCard, clear } from './dom'
 import type { Lab } from './lab'
+import { scenarioSet, scenarioSubscribers } from './scenario'
 
 export async function initTracePanel(lab: Lab, mount: HTMLElement): Promise<void> {
   let decoder: PirateDecoder | null = null
@@ -22,11 +23,13 @@ export async function initTracePanel(lab: Lab, mount: HTMLElement): Promise<void
   let busy = false
 
   // --- traitor pickers --------------------------------------------------
+  const urlTraitors = scenarioSubscribers('t')
+  const initialTraitors = urlTraitors.length > 0 ? new Set(urlTraitors) : new Set([11])
   const checks: HTMLInputElement[] = []
   const checkGrid = el('div', { class: 'trait-checks' })
   for (let u = 0; u < N; u++) {
     const input = el('input', { type: 'checkbox', id: `traitor-${u}` }) as HTMLInputElement
-    if (u === 11) input.checked = true // a default so one click can start
+    if (initialTraitors.has(u)) input.checked = true // a default so one click can start
     checks.push(input)
     checkGrid.append(el('label', { for: `traitor-${u}` }, [input, ` ${subLabel(u)}`]))
   }
@@ -65,6 +68,7 @@ export async function initTracePanel(lab: Lab, mount: HTMLElement): Promise<void
   buildBtn.addEventListener('click', () => {
     if (busy) return
     traitors = checks.flatMap((c, u) => (c.checked ? [u] : []))
+    scenarioSet({ t: traitors.map((u) => String(u + 1)).join(',') || null })
     revoked.clear()
     decoder = { rings: traitors.map((u) => lab.rings[u]) }
     clear(probeLog)

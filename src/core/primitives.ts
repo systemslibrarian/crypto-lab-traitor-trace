@@ -8,6 +8,21 @@ import { randomBytes } from './bytes'
 
 const subtle = crypto.subtle
 
+// AES key-import cache. Keyed by the exact Uint8Array instance, so long-lived
+// derived keys (node keys, subset keys) import once, while fresh per-probe
+// session keys stay collectable. Purely a performance memo — same bytes, same
+// crypto.
+const aesKeyCache = new WeakMap<Uint8Array, Promise<CryptoKey>>()
+
+function aesKey(key: Uint8Array): Promise<CryptoKey> {
+  let cached = aesKeyCache.get(key)
+  if (!cached) {
+    cached = subtle.importKey('raw', key as BufferSource, 'AES-GCM', false, ['encrypt', 'decrypt'])
+    aesKeyCache.set(key, cached)
+  }
+  return cached
+}
+
 /** HKDF-SHA-256 (RFC 5869): extract-then-expand, returns `length` bytes. */
 export async function hkdfSha256(
   ikm: Uint8Array,
@@ -52,7 +67,7 @@ export async function aesGcmSealWithIv(
   plaintext: Uint8Array,
   aad?: Uint8Array,
 ): Promise<Sealed> {
-  const k = await subtle.importKey('raw', key as BufferSource, 'AES-GCM', false, ['encrypt'])
+  const k = await aesKey(key)
   const params: AesGcmParams = { name: 'AES-GCM', iv: iv as BufferSource }
   if (aad) params.additionalData = aad as BufferSource
   const ct = new Uint8Array(await subtle.encrypt(params, k, plaintext as BufferSource))
@@ -74,7 +89,7 @@ export async function aesGcmOpen(
   aad?: Uint8Array,
 ): Promise<Uint8Array | null> {
   try {
-    const k = await subtle.importKey('raw', key as BufferSource, 'AES-GCM', false, ['decrypt'])
+    const k = await aesKey(key)
     const params: AesGcmParams = { name: 'AES-GCM', iv: sealed.iv as BufferSource }
     if (aad) params.additionalData = aad as BufferSource
     return new Uint8Array(await subtle.decrypt(params, k, sealed.ct as BufferSource))

@@ -40,20 +40,19 @@ export async function makeProbe(
   revoked: ReadonlySet<number> = new Set(),
 ): Promise<Probe> {
   const sessionKey = randomBytes(32)
-  const bc: Broadcast = {
-    header: [],
-    body: await aesGcmSeal(sessionKey, utf8(message)),
-  }
-  for (let u = 0; u < N; u++) {
-    if (revoked.has(u)) continue
-    const personalKey = await csNodeKey(master, leafNode(u))
-    const wrapped = u < boundary ? randomBytes(32) : sessionKey
-    bc.header.push({
-      subset: { kind: 'cs', node: leafNode(u) },
-      wrap: await aesGcmSeal(personalKey, wrapped),
-    })
-  }
-  return { boundary, bc }
+  const users = [...Array(N).keys()].filter((u) => !revoked.has(u))
+  const [body, ...header] = await Promise.all([
+    aesGcmSeal(sessionKey, utf8(message)),
+    ...users.map(async (u) => {
+      const personalKey = await csNodeKey(master, leafNode(u))
+      const wrapped = u < boundary ? randomBytes(32) : sessionKey
+      return {
+        subset: { kind: 'cs', node: leafNode(u) } as const,
+        wrap: await aesGcmSeal(personalKey, wrapped),
+      }
+    }),
+  ])
+  return { boundary, bc: { header, body } }
 }
 
 /**
@@ -62,6 +61,8 @@ export async function makeProbe(
  *           disagree (one opens the payload, another authenticates but yields
  *           a dud) it knows the ciphertext is a probe and answers by coin flip.
  */
+// [extension] point: richer pirate models (stateful boxes, threshold-q
+// decoders, self-destruct) slot in as new Strategy variants in pirateDecode.
 export type Strategy = 'greedy' | 'evasive'
 
 /** Per-key-set outcome, exposed so the UI can show what the pirate box sees. */
@@ -90,13 +91,13 @@ export async function pirateDecode(
   strategy: Strategy,
   coin: () => number,
 ): Promise<DecoderAnswer> {
-  const outcomes: DecoderKeySetOutcome[] = []
-  let plaintext: string | null = null
-  for (const ring of decoder.rings) {
-    const r = await subscriberDecrypt(ring, bc)
-    outcomes.push({ u: ring.u, hadEntry: r.entryIndex !== null, opened: r.opened })
-    if (r.opened && plaintext === null) plaintext = r.plaintext
-  }
+  const reports = await Promise.all(decoder.rings.map((ring) => subscriberDecrypt(ring, bc)))
+  const outcomes: DecoderKeySetOutcome[] = reports.map((r) => ({
+    u: r.u,
+    hadEntry: r.entryIndex !== null,
+    opened: r.opened,
+  }))
+  const plaintext = reports.find((r) => r.opened)?.plaintext ?? null
   const withEntry = outcomes.filter((o) => o.hadEntry)
   const opens = withEntry.filter((o) => o.opened)
   const canDecrypt = opens.length > 0
@@ -189,12 +190,6 @@ export async function decoderOpens(
 ): Promise<string | null> {
   const r = await pirateDecode(decoder, bc, 'greedy', () => 0)
   return r.output
-}
-
-export function describeProbe(probe: Probe): string {
-  const dud = probe.boundary
-  const good = 16 - probe.boundary
-  return `${dud} dud ${dud === 1 ? 'entry' : 'entries'}, ${good} real`
 }
 
 /** Round-trip used by tests: a probe's body opens under its real session key path. */

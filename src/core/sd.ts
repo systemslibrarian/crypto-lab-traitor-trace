@@ -25,6 +25,8 @@ const PRG_RIGHT = utf8('right')
 const PRG_KEY = utf8('key')
 
 /** j === null means "the full subtree of i, nobody excluded" (used when r=0). */
+// [extension] point: Layered SD (Halevy-Shamir LSD) reuses this subset shape
+// with a restricted (i,j) family; only sdCover and sdUserKeys would change.
 export interface SDSubset {
   i: number
   j: number | null

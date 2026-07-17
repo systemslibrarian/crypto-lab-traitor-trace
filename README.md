@@ -80,6 +80,12 @@ in the Media Key Block, the 2007 processing-key leak, what revocation could and 
 Revoke subscribers by clicking tree leaves, switch CS/SD covers, broadcast your own message,
 build a pirate decoder, run the trace, and push the tracer past its guarantee.
 
+Every configuration is linkable: **Copy scenario link** serializes the method, revocation
+set, selected subscriber, decoder composition, and the collusion strategy + PRNG seed into
+the URL hash (e.g. `#m=sd&r=7,12&s=1&ca=4&cb=13&st=evasive&seed=424242`), so a lecture
+slide or issue report can reopen the exact state under discussion — including a
+byte-identical collusion histogram.
+
 ## What Can Go Wrong
 
 - **Endpoint leaks aren't fixable by crypto** — a paying subscriber can re-share what it
@@ -104,11 +110,16 @@ conditional access and licensed-content distribution generally.
 
 ```bash
 npm ci
-npm run dev        # Vite dev server
-npm test           # 46 Vitest unit tests, incl. 9 spec KATs
-npm run build      # typecheck + production build
-npm run test:a11y  # axe-core WCAG 2.1 A/AA gate, both themes (preview on port 4287)
+npm run dev            # Vite dev server
+npm test               # 50 Vitest unit tests, incl. 10 spec KATs
+npm run test:coverage  # same, with v8 coverage thresholds on src/core
+npm run build          # typecheck + production build
+npm run test:a11y      # behavior specs + axe WCAG 2.1 A/AA, both themes (port 4287)
+npm run check:budget   # gzip bundle-size budget against dist/
 ```
+
+Set `ALL_BROWSERS=1` to add Firefox and WebKit to the Playwright run (CI always does).
+See `CONTRIBUTING.md`, `DESIGN.md` (paper-to-code map + invariants), and `SECURITY.md`.
 
 ## Related Demos
 
@@ -120,24 +131,31 @@ npm run test:a11y  # axe-core WCAG 2.1 A/AA gate, both themes (preview on port 4
 
 ## Build & Verify
 
-- **46 unit tests** (Vitest, colocated in `src/core/*.test.ts`), including **9 spec KATs**:
-  RFC 5869 HKDF-SHA-256 cases 1–3, RFC 4231 HMAC-SHA-256 cases 1–2, and NIST AES-256-GCM
-  test cases 13–16 (`src/core/kats.test.ts`).
+- **50 unit tests** (Vitest, colocated in `src/core/*.test.ts`), including **10 spec KATs**:
+  RFC 5869 HKDF-SHA-256 cases 1–3, RFC 4231 HMAC-SHA-256 cases 1–2, FIPS 180 SHA-256, and
+  NIST AES-256-GCM test cases 13–16 (`src/core/kats.test.ts`).
 - Scheme tests cover: cover-partition correctness for both methods (all singletons, all 120
   pairs, random sets of every size), GGM label derivation matching the center with fail-closed
   non-member derivation, broadcast round-trips, revoked-key pooling, exact single-traitor
   tracing for all 16 subscribers, coalition tracing, trace-and-revoke, and a passing test that
   the evasive-coalition flaw **does** frame an innocent (the deliberately-exhibited failure).
-- **Accessibility is gated in CI**: `@axe-core/playwright` scans the production build in both
-  themes after driving every exhibit to its post-interaction state; violations block the
-  GitHub Pages deploy (`.github/workflows/deploy.yml`).
+- **Coverage thresholds** are enforced on the crypto core (`npm run test:coverage`, v8
+  provider: ≥90% statements/functions/lines, ≥85% branches on `src/core`).
+- **Browser behavior is regression-tested**, not just scanned: `e2e/behavior.spec.ts` asserts
+  the rendered numbers and verdicts (SD=2/CS=6/naive=14 for the preset revocation, the
+  LOCKED OUT and BREACH verdict cards, the full trace-accuse-revoke-die flow, and a
+  seed-reproducible collusion histogram) alongside the axe scans in `e2e/a11y.spec.ts`.
+- **Two workflows**: `ci.yml` runs everything on pull requests (Node 22 + 24, coverage,
+  bundle budget, Chromium/Firefox/WebKit plus a mobile viewport); `deploy.yml` re-runs
+  tests, build, and the a11y gate on `main` and only then publishes to GitHub Pages.
 
 ## Performance
 
 Everything is interactive-speed in the browser: a full broadcast plus sixteen decryption
 attempts is ~40 AES-GCM operations, and the 25-trace collusion run is a few thousand WebCrypto
 calls (a second or two). Key setup derives all sixteen key rings from one 32-byte seed at page
-load.
+load. These claims are kept true by CI: a gzip bundle-size budget (`npm run check:budget`)
+fails the build if the demo bloats.
 
 ---
 

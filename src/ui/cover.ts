@@ -17,6 +17,7 @@ import { aesGcmOpen, sealedSize } from '../core/primitives'
 import { leafNode, leavesUnder, N, pathToRoot, ROOT } from '../core/tree'
 import { el, hexShort, resultLine, subLabel, verdictCard, clear } from './dom'
 import { rangeLabel, type Lab } from './lab'
+import { createCopyLinkControl, scenarioGet, scenarioSet, scenarioSubscribers } from './scenario'
 import { createTreeView } from './tree-view'
 
 function describeCsNode(node: number): string {
@@ -30,10 +31,11 @@ function describeSdSubset(i: number, j: number | null): string {
 }
 
 export async function initCoverPanel(lab: Lab, mount: HTMLElement): Promise<void> {
-  let method: Method = 'sd'
-  const revoked = new Set<number>()
+  let method: Method = scenarioGet('m') === 'cs' ? 'cs' : 'sd'
+  const revoked = new Set<number>(scenarioSubscribers('r'))
   let message = 'This month’s licensed-content session key is inside.'
-  let selected: number | null = null
+  const urlSelected = Number.parseInt(scenarioGet('s') ?? '', 10) - 1
+  let selected: number | null = urlSelected >= 0 && urlSelected < N ? urlSelected : null
   let lastBroadcast: Broadcast | null = null
   let lastSessionKey: Uint8Array | null = null
   let lastReports: DecryptReport[] = []
@@ -87,6 +89,7 @@ export async function initCoverPanel(lab: Lab, mount: HTMLElement): Promise<void
     clearBtn,
     el('label', { for: 'cover-msg', text: 'Broadcast message:' }),
     msgInput,
+    createCopyLinkControl(),
   ])
 
   // --- results --------------------------------------------------------
@@ -128,6 +131,10 @@ export async function initCoverPanel(lab: Lab, mount: HTMLElement): Promise<void
 
   async function refresh(): Promise<void> {
     const token = ++runToken
+    scenarioSet({
+      m: method,
+      r: [...revoked].sort((a, b) => a - b).map((u) => String(u + 1)).join(',') || null,
+    })
     const cs = csCover(revoked)
     const sd = sdCover(revoked)
     tree.setState({
@@ -136,8 +143,9 @@ export async function initCoverPanel(lab: Lab, mount: HTMLElement): Promise<void
     })
 
     const { bc, sessionKey } = await encryptBroadcast(lab.master, method, revoked, message)
-    const reports: DecryptReport[] = []
-    for (const ring of lab.rings) reports.push(await subscriberDecrypt(ring, bc))
+    const reports: DecryptReport[] = await Promise.all(
+      lab.rings.map((ring) => subscriberDecrypt(ring, bc)),
+    )
     if (token !== runToken) return // a newer click superseded this run
     lastBroadcast = bc
     lastSessionKey = sessionKey
@@ -198,9 +206,9 @@ export async function initCoverPanel(lab: Lab, mount: HTMLElement): Promise<void
         ]),
       ]),
       el('tbody', {}, [
-        el('tr', {}, [el('th', { scope: 'row', text: 'Naive per-recipient' }), el('td', { class: 'num', text: String(naiveCount) }), el('td', { class: 'num', text: String(naiveCount * 60) })]),
-        el('tr', {}, [el('th', { scope: 'row', text: 'Complete subtree' }), el('td', { class: 'num', text: String(cs.length) }), el('td', { class: 'num', text: String(cs.length * 60) })]),
-        el('tr', {}, [el('th', { scope: 'row', text: 'Subset difference' }), el('td', { class: 'num', text: String(sd.length) }), el('td', { class: 'num', text: String(sd.length * 60) })]),
+        el('tr', {}, [el('th', { scope: 'row', text: 'Naive per-recipient' }), el('td', { class: 'num', id: 'stat-naive', text: String(naiveCount) }), el('td', { class: 'num', text: String(naiveCount * 60) })]),
+        el('tr', {}, [el('th', { scope: 'row', text: 'Complete subtree' }), el('td', { class: 'num', id: 'stat-cs', text: String(cs.length) }), el('td', { class: 'num', text: String(cs.length * 60) })]),
+        el('tr', {}, [el('th', { scope: 'row', text: 'Subset difference' }), el('td', { class: 'num', id: 'stat-sd', text: String(sd.length) }), el('td', { class: 'num', text: String(sd.length * 60) })]),
       ]),
     )
     headerCol.append(table)
@@ -243,6 +251,7 @@ export async function initCoverPanel(lab: Lab, mount: HTMLElement): Promise<void
 
   async function renderDetail(): Promise<void> {
     clear(detailBox)
+    scenarioSet({ s: selected === null ? null : String(selected + 1) })
     if (selected === null || lastBroadcast === null) {
       tree.setFocus(null)
       detailBox.append(

@@ -60,19 +60,17 @@ export async function encryptBroadcast(
   message: string,
 ): Promise<BroadcastResult> {
   const sessionKey = randomBytes(32)
-  const header: HeaderEntry[] = []
-  if (method === 'cs') {
-    for (const node of csCover(revoked)) {
-      const key = await csNodeKey(master, node)
-      header.push({ subset: { kind: 'cs', node }, wrap: await aesGcmSeal(key, sessionKey) })
-    }
-  } else {
-    for (const s of sdCover(revoked)) {
-      const key = await sdSubsetKey(master, s)
-      header.push({ subset: { kind: 'sd', i: s.i, j: s.j }, wrap: await aesGcmSeal(key, sessionKey) })
-    }
-  }
-  const body = await aesGcmSeal(sessionKey, utf8(message))
+  const entries: Promise<HeaderEntry>[] =
+    method === 'cs'
+      ? csCover(revoked).map(async (node) => ({
+          subset: { kind: 'cs', node } as const,
+          wrap: await aesGcmSeal(await csNodeKey(master, node), sessionKey),
+        }))
+      : sdCover(revoked).map(async (s) => ({
+          subset: { kind: 'sd', i: s.i, j: s.j } as const,
+          wrap: await aesGcmSeal(await sdSubsetKey(master, s), sessionKey),
+        }))
+  const [body, ...header] = await Promise.all([aesGcmSeal(sessionKey, utf8(message)), ...entries])
   return { bc: { header, body }, sessionKey }
 }
 
@@ -86,13 +84,14 @@ export async function encryptNaivePerRecipient(
   message: string,
 ): Promise<BroadcastResult> {
   const sessionKey = randomBytes(32)
-  const header: HeaderEntry[] = []
-  for (let u = 0; u < N; u++) {
-    if (revoked.has(u)) continue
-    const key = await csNodeKey(master, leafNode(u))
-    header.push({ subset: { kind: 'cs', node: leafNode(u) }, wrap: await aesGcmSeal(key, sessionKey) })
-  }
-  const body = await aesGcmSeal(sessionKey, utf8(message))
+  const users = [...Array(N).keys()].filter((u) => !revoked.has(u))
+  const [body, ...header] = await Promise.all([
+    aesGcmSeal(sessionKey, utf8(message)),
+    ...users.map(async (u) => ({
+      subset: { kind: 'cs', node: leafNode(u) } as const,
+      wrap: await aesGcmSeal(await csNodeKey(master, leafNode(u)), sessionKey),
+    })),
+  ])
   return { bc: { header, body }, sessionKey }
 }
 
