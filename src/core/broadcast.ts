@@ -106,6 +106,8 @@ export interface DecryptReport {
   /** Did the recovered session key open the payload (GCM tag verified)? */
   opened: boolean
   plaintext: string | null
+  /** The session key this subscriber recovered, if the unwrap authenticated. */
+  sessionKey: Uint8Array | null
 }
 
 async function entryKeyFor(ring: UserKeyRing, entry: HeaderEntry): Promise<Uint8Array | null> {
@@ -128,7 +130,7 @@ export async function subscriberDecrypt(ring: UserKeyRing, bc: Broadcast): Promi
     if (key === null) continue
     const sessionKey = await aesGcmOpen(key, bc.header[idx].wrap)
     if (sessionKey === null) {
-      return { u: ring.u, entryIndex: idx, unwrapOk: false, opened: false, plaintext: null }
+      return { u: ring.u, entryIndex: idx, unwrapOk: false, opened: false, plaintext: null, sessionKey: null }
     }
     const pt = await aesGcmOpen(sessionKey, bc.body)
     return {
@@ -137,9 +139,10 @@ export async function subscriberDecrypt(ring: UserKeyRing, bc: Broadcast): Promi
       unwrapOk: true,
       opened: pt !== null,
       plaintext: pt === null ? null : utf8Decode(pt),
+      sessionKey,
     }
   }
-  return { u: ring.u, entryIndex: null, unwrapOk: false, opened: false, plaintext: null }
+  return { u: ring.u, entryIndex: null, unwrapOk: false, opened: false, plaintext: null, sessionKey: null }
 }
 
 /** Total header bytes as they would go on the wire (IV + ct + tag per entry). */

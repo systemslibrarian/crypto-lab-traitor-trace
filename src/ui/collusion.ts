@@ -6,7 +6,7 @@
  */
 
 import { encryptBroadcast } from '../core/broadcast'
-import { pirateDecode, traceTraitor, makeXorshift, type Strategy } from '../core/trace'
+import { makeProbe, pirateDecode, traceTraitor, makeXorshift, type Strategy } from '../core/trace'
 import { N } from '../core/tree'
 import { el, resultLine, subLabel, verdictCard, clear } from './dom'
 import type { Lab } from './lab'
@@ -63,11 +63,65 @@ export async function initCollusionPanel(lab: Lab, mount: HTMLElement): Promise<
     stratSet.append(el('label', { for: `strat-${value}` }, [input, ` ${label} `]))
   }
 
+  const peekBtn = el('button', { type: 'button', id: 'peek-probe', text: 'Look through the box’s eyes at one probe' }) as HTMLButtonElement
+  const peekBox = el('div', { 'aria-live': 'polite', id: 'peek-box' })
   const runBtn = el('button', { class: 'primary', type: 'button', id: 'run-collusion', text: 'Run 25 traces' }) as HTMLButtonElement
   const histBox = el('div', {})
   const summaryBox = el('div', { role: 'status', 'aria-live': 'polite' })
 
+  peekBtn.addEventListener('click', () => void runPeek())
   runBtn.addEventListener('click', () => void runMany())
+
+  /** Show the decoder's-eye view of the one probe it can always detect. */
+  async function runPeek(): Promise<void> {
+    if (busy) return
+    const a = Number(selA.value)
+    const b = Number(selB.value)
+    if (a === b) {
+      clear(peekBox)
+      peekBox.append(verdictCard('warn', [resultLine('Setup', 'warn', 'pick two different subscribers first')]))
+      return
+    }
+    busy = true
+    try {
+      const lo = Math.min(a, b)
+      const hi = Math.max(a, b)
+      // boundary = hi corrupts everything below hi: lo's entry goes dud
+      // while hi's still works — the detectable disagreement, guaranteed.
+      const probe = await makeProbe(lab.master, hi, 'probe payload')
+      const answer = await pirateDecode({ rings: [lab.rings[lo], lab.rings[hi]] }, probe.bc, 'evasive', () => 0)
+      clear(peekBox)
+      const lines: HTMLElement[] = [
+        el('h3', { text: `What the box sees on probe boundary=${hi} (subscribers below ${subLabel(hi)} get dud keys)` }),
+      ]
+      for (const o of answer.outcomes) {
+        lines.push(
+          resultLine(
+            `Via ${subLabel(o.u)}’s keys`,
+            'neutral',
+            o.opened
+              ? 'entry authenticates ✓ → recovered session key OPENS the payload'
+              : 'entry authenticates ✓ → recovered session key is a dud (payload tag rejects it)',
+          ),
+        )
+      }
+      lines.push(
+        resultLine(
+          'The comparison',
+          'warn',
+          'its own two entries disagree — honest broadcasts never do that. The box now KNOWS this is a probe, and it can still decrypt: its answer has become a free choice.',
+        ),
+        resultLine(
+          'A lone box, for contrast',
+          'neutral',
+          'one key set = one entry = nothing to compare. It either decrypts (and the probe looked like normal traffic) or it can’t (and silence is exactly what the tracer expected). That is the entire collusion bound.',
+        ),
+      )
+      peekBox.append(verdictCard('warn', lines))
+    } finally {
+      busy = false
+    }
+  }
 
   function makeSelect(id: string, initial: number): HTMLSelectElement {
     const sel = el('select', { id }) as HTMLSelectElement
@@ -149,8 +203,10 @@ export async function initCollusionPanel(lab: Lab, mount: HTMLElement): Promise<
       el('label', { for: 'collusion-b', text: 'Traitor 2:' }),
       selB,
       stratSet,
+      peekBtn,
       runBtn,
     ]),
+    peekBox,
     histBox,
     summaryBox,
   )

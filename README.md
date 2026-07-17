@@ -36,22 +36,27 @@ power. **Not production crypto — a teaching demo** (16 subscribers instead of 
    header, but revoking one subscriber reissues 15 keys, shown as 15 live AES-GCM wraps) vs.
    one wrap per subscriber (free revocation, but the header carries the whole roster forever).
 2. **The subset cover** — the headline mechanism. Click subscribers to revoke; the CS and SD
-   covers recompute live on the tree (cover roots marked, SD exclusions crossed out), the
+   cover *subtrees light up as regions on the tree* (SD exclusions painted back out), the
    header shrinks (e.g. revoke #7 + #12: SD = 2 wraps, CS = 6, naive = 14), and all sixteen
-   decoders are tested against the real ciphertext. Each subscriber's detail view renders the
+   decoders are tested against the real ciphertext. Selecting a subscriber highlights its
+   membership chain up to its one covering subset and compares both sides byte-for-byte:
+   the session key it derived vs. the one the center generated. Each detail view renders the
    **cryptographic result and the security verdict as separate indicators** — a revoked
-   decoder shows "AES-GCM: authentication failed" next to "verdict: LOCKED OUT — holding ✓",
-   and its key-ring fingerprint proves no revocation ever rewrote anyone's keys.
+   decoder shows "AES-GCM: authentication failed" (a forced attempt that really runs) next to
+   "verdict: LOCKED OUT — holding ✓", and its key-ring fingerprint proves no revocation ever
+   rewrote anyone's keys.
 3. **The tracing** — build a pirate decoder from any subscribers' key sets. It opens a
    subscribers-only broadcast (crypto: valid ✓ / verdict: BREACH ✗ — the lab's point in one
    card), then probe ciphertexts binary-search the roster until the box's owner is named.
    Trace-and-revoke finishes the job: revoke the accused, watch the box die or survive, trace
    again.
 4. **Collusion — the honest limit** — two revoked subscribers pool keys and still open
-   nothing; then a two-traitor decoder that detects probes (one of its entries opens the
-   payload, the other authenticates but yields a dud — an asymmetry honest traffic never
-   shows) answers by coin flip and drags 25 tracing runs across the roster, framing innocents.
-   The bound is stated precisely in-page, along with what the full NNL procedure does about it.
+   nothing; a "look through the box's eyes" view shows one probe from the decoder's side
+   (one of its entries opens the payload, the other authenticates but yields a dud — an
+   asymmetry honest traffic never shows, and the reason a lone box can never dodge); then the
+   evasive coalition box answers detected probes by coin flip and drags 25 tracing runs across
+   the roster, framing innocents. The bound is stated precisely in-page, along with what the
+   full NNL procedure does about it.
 
 Plus context panels: the licensed-database framing (per-institution keys, lapsed
 subscriptions, leaked proxy credentials — same math), and AACS on Blu-ray (subset difference

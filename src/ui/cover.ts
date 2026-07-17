@@ -10,10 +10,11 @@ import {
   type DecryptReport,
   type Method,
 } from '../core/broadcast'
+import { bytesEq } from '../core/bytes'
 import { csCover } from '../core/cs'
 import { sdCover } from '../core/sd'
 import { aesGcmOpen, sealedSize } from '../core/primitives'
-import { leafNode, leavesUnder, N, ROOT } from '../core/tree'
+import { leafNode, leavesUnder, N, pathToRoot, ROOT } from '../core/tree'
 import { el, hexShort, resultLine, subLabel, verdictCard, clear } from './dom'
 import { rangeLabel, type Lab } from './lab'
 import { createTreeView } from './tree-view'
@@ -34,6 +35,7 @@ export async function initCoverPanel(lab: Lab, mount: HTMLElement): Promise<void
   let message = 'This month’s licensed-content session key is inside.'
   let selected: number | null = null
   let lastBroadcast: Broadcast | null = null
+  let lastSessionKey: Uint8Array | null = null
   let lastReports: DecryptReport[] = []
   let runToken = 0
 
@@ -59,7 +61,7 @@ export async function initCoverPanel(lab: Lab, mount: HTMLElement): Promise<void
     methodSet.append(el('span', { text: ' ' }))
   }
 
-  const presetBtn = el('button', { type: 'button', id: 'cover-preset', text: 'Revoke #7 + #12' })
+  const presetBtn = el('button', { type: 'button', class: 'primary', id: 'cover-preset', text: 'Revoke #7 + #12' })
   presetBtn.addEventListener('click', () => {
     revoked.clear()
     revoked.add(6)
@@ -128,16 +130,17 @@ export async function initCoverPanel(lab: Lab, mount: HTMLElement): Promise<void
     const token = ++runToken
     const cs = csCover(revoked)
     const sd = sdCover(revoked)
-    const coverNodes = new Set<number>(method === 'cs' ? cs : sd.map((s) => s.i))
-    const excludedNodes = new Set<number>()
-    if (method === 'sd') for (const s of sd) if (s.j !== null) excludedNodes.add(s.j)
-    tree.setState({ revoked, coverNodes, excludedNodes })
+    tree.setState({
+      revoked,
+      subsets: method === 'cs' ? cs.map((node) => ({ i: node, j: null })) : sd,
+    })
 
-    const { bc } = await encryptBroadcast(lab.master, method, revoked, message)
+    const { bc, sessionKey } = await encryptBroadcast(lab.master, method, revoked, message)
     const reports: DecryptReport[] = []
     for (const ring of lab.rings) reports.push(await subscriberDecrypt(ring, bc))
     if (token !== runToken) return // a newer click superseded this run
     lastBroadcast = bc
+    lastSessionKey = sessionKey
     lastReports = reports
 
     // headline numbers
@@ -157,7 +160,9 @@ export async function initCoverPanel(lab: Lab, mount: HTMLElement): Promise<void
         resultLine(
           'Header size',
           'ok',
-          `${active} wrapped ${active === 1 ? 'key' : 'keys'} instead of ${naiveCount} per-recipient wraps — with ${r} revoked`,
+          naiveCount === 0
+            ? 'everyone is revoked — the header is empty and nobody can decrypt'
+            : `${active} wrapped ${active === 1 ? 'key' : 'keys'} instead of ${naiveCount} per-recipient wraps — with ${r} revoked`,
         ),
         resultLine('Keys reissued by this revocation', 'ok', '0 — every remaining subscriber decrypts with a key it has held since setup'),
       ]),
@@ -239,11 +244,25 @@ export async function initCoverPanel(lab: Lab, mount: HTMLElement): Promise<void
   async function renderDetail(): Promise<void> {
     clear(detailBox)
     if (selected === null || lastBroadcast === null) {
-      detailBox.append(el('p', { class: 'panel-lead', text: 'No subscriber selected yet.' }))
+      tree.setFocus(null)
+      detailBox.append(
+        el('p', { class: 'panel-lead', text: 'Pick a subscriber above to see its one covering subset light up on the tree and its decryption traced step by step.' }),
+      )
       return
     }
     const rep = lastReports[selected]
     const isRevoked = revoked.has(selected)
+
+    // light this subscriber's membership chain up to its cover node
+    if (rep.entryIndex !== null) {
+      const subset = lastBroadcast.header[rep.entryIndex].subset
+      const coverNode = subset.kind === 'cs' ? subset.node : subset.i
+      const chain = pathToRoot(leafNode(selected))
+      tree.setFocus(chain.slice(0, chain.indexOf(coverNode) + 1))
+    } else {
+      tree.setFocus(null)
+    }
+
     const lines: HTMLElement[] = [el('h3', { text: `Subscriber ${subLabel(selected)} — what actually happened` })]
     if (rep.entryIndex === null) {
       lines.push(
@@ -264,9 +283,28 @@ export async function initCoverPanel(lab: Lab, mount: HTMLElement): Promise<void
         )
       }
     } else {
+      const subset = lastBroadcast.header[rep.entryIndex].subset
+      const desc = subset.kind === 'cs' ? describeCsNode(subset.node) : describeSdSubset(subset.i, subset.j)
+      const keysMatch =
+        rep.sessionKey !== null && lastSessionKey !== null && bytesEq(rep.sessionKey, lastSessionKey)
       lines.push(
-        resultLine('Header scan', 'neutral', `entry ${rep.entryIndex + 1} covers this subscriber — exactly one, as the cover guarantees`),
+        resultLine(
+          'Header scan',
+          'neutral',
+          `entry ${rep.entryIndex + 1} of ${lastBroadcast.header.length} — ${desc} — the ONE subset containing this leaf (lit on the tree above)`,
+        ),
         resultLine('AES-GCM key unwrap', rep.unwrapOk ? 'ok' : 'alarm', rep.unwrapOk ? 'tag verified, session key recovered' : 'authentication failed'),
+      )
+      if (rep.sessionKey !== null && lastSessionKey !== null) {
+        lines.push(
+          resultLine(
+            'Both sides compared',
+            keysMatch ? 'ok' : 'alarm',
+            `subscriber derived ${hexShort(rep.sessionKey)} · center generated ${hexShort(lastSessionKey)} — ${keysMatch ? 'byte-for-byte identical' : 'MISMATCH'}`,
+          ),
+        )
+      }
+      lines.push(
         resultLine('AES-GCM payload', rep.opened ? 'ok' : 'alarm', rep.opened ? `opened: “${rep.plaintext}”` : 'authentication failed'),
       )
     }

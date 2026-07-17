@@ -352,6 +352,24 @@ fieldset legend {
 .tree-svg .edge {
   stroke: var(--border);
   stroke-width: 1.5;
+  transition: stroke 0.25s, stroke-width 0.25s;
+}
+.tree-svg .edge.hot {
+  stroke: var(--accent-strong);
+  stroke-width: 3.5;
+}
+.tree-svg .region {
+  fill: color-mix(in oklab, var(--accent) 16%, transparent);
+  stroke: color-mix(in oklab, var(--accent) 45%, transparent);
+  stroke-width: 1;
+  transition: fill 0.25s;
+}
+.tree-svg .region-cut {
+  fill: var(--bg-inset);
+  fill-opacity: 0.92;
+  stroke: var(--danger);
+  stroke-dasharray: 4 3;
+  stroke-width: 1;
 }
 .tree-svg .node circle {
   fill: var(--bg-panel);
@@ -394,6 +412,10 @@ fieldset legend {
 .tree-svg .node.excluded .exmark {
   display: block;
 }
+.tree-svg .node.hot circle {
+  stroke: var(--accent-strong);
+  stroke-width: 3;
+}
 .leaf-row {
   display: grid;
   grid-template-columns: repeat(16, 1fr);
@@ -422,6 +444,9 @@ fieldset legend {
 }
 #app .leaf-btn.covered {
   border-color: var(--accent-strong);
+}
+#app .leaf-btn.hot {
+  box-shadow: 0 0 0 2px var(--accent-strong);
 }
 .tree-legend {
   display: flex;

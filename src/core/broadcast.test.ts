@@ -7,7 +7,7 @@
  */
 
 import { beforeAll, describe, expect, it } from 'vitest'
-import { randomBytes, toHex } from './bytes'
+import { bytesEq, randomBytes, toHex } from './bytes'
 import {
   buildUserKeyRing,
   encryptBroadcast,
@@ -48,7 +48,7 @@ describe('broadcast round trips', () => {
   it('revoked #7/#12 (1-indexed): authorized decrypt, revoked locked out, both methods', async () => {
     const revoked = new Set([6, 11])
     for (const method of METHODS) {
-      const { bc } = await encryptBroadcast(master, method, revoked, 'monthly session key inside')
+      const { bc, sessionKey } = await encryptBroadcast(master, method, revoked, 'monthly session key inside')
       expect(bc.header.length).toBe(method === 'cs' ? 6 : 2)
       for (const ring of rings) {
         const r = await subscriberDecrypt(ring, bc)
@@ -63,6 +63,9 @@ describe('broadcast round trips', () => {
           expect(r.unwrapOk).toBe(true)
           expect(r.opened).toBe(true)
           expect(r.plaintext).toBe('monthly session key inside')
+          // compute-both-sides-and-compare: the subscriber-derived session
+          // key is byte-identical to the one the center generated
+          expect(bytesEq(r.sessionKey!, sessionKey)).toBe(true)
         }
       }
     }

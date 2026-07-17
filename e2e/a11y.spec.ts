@@ -36,8 +36,11 @@ async function driveDemos(page: Page): Promise<void> {
   await page.locator('#revoke-accused').click({ timeout: 60_000 })
   await expect(page.locator('#trace-app .verdict-card').last()).toBeVisible()
 
-  // Exhibit 4: pooled revoked keys, then 25 evasive traces -> histogram
+  // Exhibit 4: pooled revoked keys, the box's-eye probe view, then 25
+  // evasive traces -> histogram
   await page.locator('#pool-revoked').click()
+  await page.locator('#peek-probe').click()
+  await expect(page.locator('#peek-box .verdict-card')).toBeVisible()
   await page.locator('#run-collusion').click()
   await expect(page.locator('#collusion-app .hist-row').first()).toBeVisible({ timeout: 60_000 })
 
