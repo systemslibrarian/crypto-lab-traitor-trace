@@ -9,6 +9,13 @@
   --text: #e8eef5;
   --text-dim: #a9b8c7;
   --border: #2b3d50;
+  /* Control boundaries only (#app select, #app input[type="text"]). Those controls
+     are filled with --bg-inset, which sits 1.03:1 from the panel behind them — the
+     border is the only thing that makes the control visible, and WCAG 2.1 SC 1.4.11
+     requires 3:1. --border measured 1.70:1 at best / 1.56:1 at worst; --border-strong
+     is 3.51:1 on --bg, 3.21:1 on --bg-panel, 3.39:1 on --bg-inset. --border stays
+     as-is for decorative rules (card outlines, dividers, chips, table rules). */
+  --border-strong: #5e6c7a;
   --ok: #5bd48b; /* success/integrity text */
   --danger: #ff8585; /* alarm text */
   --warn: #ffc860; /* caution text */
@@ -23,6 +30,8 @@
   --text: #16232f;
   --text-dim: #44586c;
   --border: #b9c9d8;
+  /* 3.42:1 on --bg, 3.68:1 on --bg-panel, 3.20:1 on --bg-inset (was 1.69:1 / 1.47:1). */
+  --border-strong: #7c8791;
   --ok: #0e6b36;
   --danger: #b3261e;
   --warn: #7a5300;
@@ -168,7 +177,7 @@ details.expert[open] > summary {
   font: inherit;
   color: var(--text);
   background: var(--bg-inset);
-  border: 1px solid var(--border);
+  border: 1px solid var(--border-strong);
   border-radius: 8px;
   padding: 0.35rem 1.7rem 0.35rem 0.6rem;
   min-height: 44px;
@@ -187,7 +196,7 @@ details.expert[open] > summary {
   font: inherit;
   color: var(--text);
   background: var(--bg-inset);
-  border: 1px solid var(--border);
+  border: 1px solid var(--border-strong);
   border-radius: 8px;
   padding: 0.4rem 0.6rem;
   width: min(100%, 30rem);
