@@ -6,3 +6,8 @@ playwright-report/
 blob-report/
 .playwright/
 *.local
+
+# Review notes kept locally, not part of the shipped demo
+chat*.md
+gem.md
+.DS_Store
