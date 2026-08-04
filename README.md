@@ -114,7 +114,7 @@ npm run dev            # Vite dev server
 npm test               # 50 Vitest unit tests, incl. 10 spec KATs
 npm run test:coverage  # same, with v8 coverage thresholds on src/core
 npm run build          # typecheck + production build
-npm run test:a11y      # behavior specs + axe WCAG 2.1 A/AA, both themes (port 4287)
+npm run test:a11y      # behavior specs + axe WCAG 2.1 A/AA, both themes (port 4673)
 npm run check:budget   # gzip bundle-size budget against dist/
 ```
 

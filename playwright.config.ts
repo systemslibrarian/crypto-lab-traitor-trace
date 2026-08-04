@@ -17,7 +17,7 @@ export default defineConfig({
   retries: process.env.CI ? 1 : 0,
   reporter: 'list',
   use: {
-    baseURL: 'http://localhost:4287/crypto-lab-traitor-trace/',
+    baseURL: 'http://localhost:4673/crypto-lab-traitor-trace/',
     colorScheme: 'dark',
   },
   projects: [
@@ -42,8 +42,8 @@ export default defineConfig({
     // Build before previewing. `vite preview` only serves whatever is already
     // in dist/, so without this a failed build leaves the last good bundle in
     // place and the suite passes green against source that no longer compiles.
-    command: 'npm run build && npm run preview -- --port 4287 --strictPort',
-    url: 'http://localhost:4287/crypto-lab-traitor-trace/',
+    command: 'npm run build && npm run preview -- --port 4673 --strictPort',
+    url: 'http://localhost:4673/crypto-lab-traitor-trace/',
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,
   },

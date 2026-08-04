@@ -17,7 +17,7 @@ npm run test:a11y      # Playwright: behavior specs + axe WCAG 2.1 A/AA, both th
 npm run check:budget   # gzip bundle-size budget against dist/
 ```
 
-The Playwright preview uses **port 4287** (unique per lab across the fleet — never change it
+The Playwright preview uses **port 4673** (unique per lab across the fleet — never change it
 to 4173). Set `ALL_BROWSERS=1` to add Firefox and WebKit projects locally
 (`npx playwright install` first); CI always runs all browsers plus a mobile viewport.
 
