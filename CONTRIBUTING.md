@@ -32,8 +32,10 @@ to 4173). Set `ALL_BROWSERS=1` to add Firefox and WebKit projects locally
   `DESIGN.md` for the invariants a change must preserve.
 - **Precision of claims is a merge blocker.** UI copy and README statements about what an
   attack or bound achieves must be exactly true for the exact construction built here.
-- **Chrome is managed.** The shared top bar between the `BEGIN/END crypto-lab shared header`
-  markers in `index.html` is fleet-managed — never hand-edit it; it is reapplied by
-  `crypto-lab/reapply-header.py`. The hero block and scripture footer follow the template.
+- **Chrome is this lab's own.** The top bar, hero block and scripture footer live in this
+  repo and are edited here. There is no shared-header snippet and no script that reapplies
+  one: the fleet-wide push (`shared-header.html` + `reapply-header.py`) was retired to
+  `crypto-lab/archive/header-rollout/`. Keep the chrome visually consistent with the rest of
+  the fleet by review, not by running anything.
 - Tests are colocated (`src/core/foo.ts` → `src/core/foo.test.ts`); Playwright specs live in
   `e2e/` and are excluded from Vitest.
