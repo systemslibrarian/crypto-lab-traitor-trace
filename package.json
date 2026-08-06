@@ -20,7 +20,7 @@
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.12.1",
-    "@playwright/test": "^1.61.1",
+    "@playwright/test": "^1.62.1",
     "@vitest/coverage-v8": "^2.1.9",
     "typescript": "~5.7.2",
     "vite": "^6.0.0",
