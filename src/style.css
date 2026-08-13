@@ -1,3 +1,17 @@
+/* Without this, `width: 100%` plus padding is WIDER than its container.
+   `.cl-hero-why` takes `width: 100%` below 640px and carries 33.6px of padding
+   plus 2px of border, so under the default `content-box` it renders 390px wide
+   inside a 354.4px column and the DOCUMENT scrolls sideways — 403px against a
+   380px viewport, at every phone width, in every state, from first paint
+   (WCAG 1.4.10). The shared `.cl-hero` block is copied into every lab and
+   assumes this reset; the labs that already set it never saw the bug. Measured
+   here before (403px) and after (380px). */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
 /* ============ theme tokens (dark default, light override) ============ */
 :root {
   color-scheme: dark;
@@ -9,13 +23,22 @@
   --text: #e8eef5;
   --text-dim: #a9b8c7;
   --border: #2b3d50;
-  /* Control boundaries only (#app select, #app input[type="text"]). Those controls
-     are filled with --bg-inset, which sits 1.03:1 from the panel behind them — the
-     border is the only thing that makes the control visible, and WCAG 2.1 SC 1.4.11
-     requires 3:1. --border measured 1.70:1 at best / 1.56:1 at worst; --border-strong
-     is 3.51:1 on --bg, 3.21:1 on --bg-panel, 3.39:1 on --bg-inset. --border stays
-     as-is for decorative rules (card outlines, dividers, chips, table rules). */
+  /* EVERY authored control boundary and every meaningful graphic edge: buttons,
+     selects, text inputs, and the subscriber tree's nodes and edges. All of them
+     are --bg-inset or --bg-panel on --bg-panel, which sit 1.03:1 apart, so the
+     border is the only thing that makes the shape visible and WCAG 2.1 SC 1.4.11
+     requires 3:1. --border measured 1.70:1 at best / 1.56:1 at worst — 1.47:1 on
+     a button in dark, measured on every one of them; --border-strong is 3.51:1
+     on --bg, 3.21:1 on --bg-panel, 3.39:1 on --bg-inset. --border stays as-is for
+     genuinely decorative rules: card outlines, dividers, chips, table rules. */
   --border-strong: #5e6c7a;
+  /* The solid-fill button. `--accent` #0369a1 is 2.92:1 against --bg-panel in
+     dark — under the 3:1 SC 1.4.11 asks of a control that has no other
+     delineator — and it cannot simply be lightened, because the shared top bar
+     reads --accent for its brand ink and badge. So the FILL gets its own token:
+     3.52:1 against --bg-panel in dark, 4.93:1 against white in light, with the
+     button's own #ffffff ink at 4.93:1 in both. */
+  --accent-btn: #0b76b3;
   --ok: #5bd48b; /* success/integrity text */
   --danger: #ff8585; /* alarm text */
   --warn: #ffc860; /* caution text */
@@ -32,6 +55,8 @@
   --border: #b9c9d8;
   /* 3.42:1 on --bg, 3.68:1 on --bg-panel, 3.20:1 on --bg-inset (was 1.69:1 / 1.47:1). */
   --border-strong: #7c8791;
+  /* Same fill in both themes: 4.93:1 against the white --bg-panel here. */
+  --accent-btn: #0b76b3;
   --ok: #0e6b36;
   --danger: #b3261e;
   --warn: #7a5300;
@@ -146,7 +171,7 @@ details.expert[open] > summary {
   font: inherit;
   color: var(--text);
   background: var(--bg-inset);
-  border: 1px solid var(--border);
+  border: 1px solid var(--border-strong);
   border-radius: 8px;
   padding: 0.4rem 0.85rem;
   min-height: 44px;
@@ -156,8 +181,8 @@ details.expert[open] > summary {
   border-color: var(--accent-strong);
 }
 #app button.primary {
-  background: var(--accent);
-  border-color: var(--accent);
+  background: var(--accent-btn);
+  border-color: var(--accent-btn);
   color: #ffffff;
 }
 #app button[aria-pressed='true'] {
@@ -366,8 +391,15 @@ fieldset legend {
   width: 100%;
   height: auto;
 }
+/* SC 1.4.11 for a meaningful graphic, not decoration: which node is a cover-set
+   root and which leaves hang under it IS Exhibit 2's whole argument, and the
+   stroke is what says so. Drawn with the surface-divider `--border` these
+   measured 1.47:1 (dark) and 1.65:1 (light) against the --bg-inset tree
+   surface; `--border-strong` puts them at 3.39:1 and 3.20:1. Neither oracle in
+   this gate can reach an SVG stroke, so `auditGraphics` in e2e/gate.ts measures
+   them directly at every driven state. */
 .tree-svg .edge {
-  stroke: var(--border);
+  stroke: var(--border-strong);
   stroke-width: 1.5;
   transition: stroke 0.25s, stroke-width 0.25s;
 }
@@ -375,9 +407,16 @@ fieldset legend {
   stroke: var(--accent-strong);
   stroke-width: 3.5;
 }
+/* The tinted block the legend calls "one cover subset". Its 16% fill is
+   deliberately faint — node labels are drawn over it and it must not fight
+   them — so the fill measures 1.14:1 (dark) / 1.25:1 (light) against the tree
+   surface and cannot be what delineates the block. Its OUTLINE has to be, and a
+   45% mix of --accent was not: 1.55:1 / 1.97:1. `--accent-strong` is the
+   AA-on-surface accent ink and puts the outline at 9.12:1 / 6.59:1, which is
+   what makes the extent of each subset readable without touching the fill. */
 .tree-svg .region {
   fill: color-mix(in oklab, var(--accent) 16%, transparent);
-  stroke: color-mix(in oklab, var(--accent) 45%, transparent);
+  stroke: var(--accent-strong);
   stroke-width: 1;
   transition: fill 0.25s;
 }
@@ -390,7 +429,7 @@ fieldset legend {
 }
 .tree-svg .node circle {
   fill: var(--bg-panel);
-  stroke: var(--border);
+  stroke: var(--border-strong);
   stroke-width: 1.5;
   transition: fill 0.25s, stroke 0.25s;
 }

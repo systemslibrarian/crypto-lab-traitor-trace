@@ -1,79 +1,74 @@
-import AxeBuilder from '@axe-core/playwright'
-import { expect, test, type Page } from '@playwright/test'
-
-const TAGS = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa']
+import { expect, test } from '@playwright/test'
+import {
+  boot,
+  driveAllStates,
+  expectBaselineNotStale,
+  NARROW,
+  reportCollected,
+  watchPageErrors,
+} from './gate'
 
 /**
- * Drive every exhibit into its post-interaction state before scanning: axe
- * only checks what is in the DOM, and the dynamic verdict regions are
- * exactly where contrast/live-region violations hide.
+ * WCAG A/AA regression gate for Traitor Trace.
+ *
+ * The lab is driven along everything it teaches, and EVERY state is scanned
+ * while it is on screen: the arrival page, where a cover has already been
+ * computed and all sixteen decoders tested against a real broadcast; the rekey
+ * storm and its restoration; the preset revocation under BOTH cover methods,
+ * with a revoked subscriber's genuine GCM failure and an authorized one's
+ * membership chain lit on the tree; a third revocation made by clicking a leaf;
+ * a re-encrypted payload; the scenario-link confirmation; everyone revoked, so
+ * the header is empty and nobody decrypts; an EMPTY pirate decoder; a
+ * single-traitor decoder built, traced to its accusation, and revoked until the
+ * box is dead; a two-key-set coalition box traced; pooled revoked keys opening
+ * nothing; both one-subscriber "coalition" refusals; the box's-eye view of the
+ * one probe a coalition can always detect; and the 25-trace histogram on BOTH
+ * decoder strategies — including `greedy`, the branch where the tracing
+ * guarantee holds, which this lab does not ship on.
+ *
+ * Four configurations: {dark, light} × {1280, 380}, with the viewport set
+ * EXPLICITLY rather than inherited. `playwright.config.ts` defines a
+ * `mobile-chromium` project at 390x844, so a test that relied on the project's
+ * viewport would run its "1280" configuration at 390px and label it wrong.
+ *
+ * The a11y gate runs in the `chromium` project only. It already renders both
+ * widths itself, and the only thing `mobile-chromium` adds is `pointer: coarse`
+ * — which in this repo reaches nothing but `min-height`/`min-width` on the
+ * shared top bar's `.cl-btn`, while `#app button` and `#app select` already
+ * carry `min-height: 44px` unconditionally. Running it in both projects would
+ * double an eight-minute suite to measure a media query that changes no colour
+ * and no layout inside `#app`. The behaviour spec still runs in both.
+ *
+ * See `gate.ts` for what the old spec did: it injected motion suppression that
+ * could not reach `dom.ts`'s own `matchMedia` check, opened all six `<details>`
+ * by setting `.open` from script, walked all four exhibits and then scanned
+ * ONCE — after every `clear()` had already replaced what it built — and never
+ * touched the empty-decoder, everyone-revoked, or greedy-strategy branches at
+ * all.
  */
-async function driveDemos(page: Page): Promise<void> {
-  await page.addStyleTag({
-    content: `*,*::before,*::after{animation:none!important;transition:none!important}`,
+
+const WIDE = { width: 1280, height: 900 }
+
+for (const theme of ['dark', 'light'] as const) {
+  test(`no WCAG A/AA violations in ${theme} theme`, async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name !== 'chromium', 'the a11y gate sets its own viewports')
+    test.setTimeout(1_800_000)
+    const errors = watchPageErrors(page)
+    await boot(page, theme, WIDE)
+    await driveAllStates(page, theme)
+    expect(errors, errors.join('\n')).toEqual([])
+    expectBaselineNotStale()
+    reportCollected()
   })
-  // panels are built asynchronously after key-ring setup
-  await expect(page.locator('#sub-cell-0')).toBeVisible({ timeout: 30_000 })
 
-  // Exhibit 1: run the shared-group-key rekey storm
-  await page.locator('#naive-revoke').click()
-  await expect(page.locator('#naive-app .entry-bar').first()).toBeVisible()
-
-  // Exhibit 2: preset revocation, inspect a revoked and an authorized subscriber,
-  // then flip to the complete-subtree method
-  await page.locator('#cover-preset').click()
-  await expect(page.locator('#sub-cell-6.is-locked')).toBeVisible()
-  await page.locator('#sub-cell-6').click()
-  await expect(page.locator('#sub-detail .verdict-card')).toBeVisible()
-  await page.locator('#sub-cell-0').click()
-  await page.locator('#method-cs').check()
-  await expect(page.locator('#sub-cell-0.is-ok')).toBeVisible()
-
-  // Exhibit 3: build the decoder (default traitor #12), trace it to the
-  // accusation, then run the trace-and-revoke follow-up
-  await page.locator('#build-decoder').click()
-  await page.locator('#run-trace').click()
-  await page.locator('#revoke-accused').click({ timeout: 60_000 })
-  await expect(page.locator('#trace-app .verdict-card').last()).toBeVisible()
-
-  // Exhibit 4: pooled revoked keys, the box's-eye probe view, then 25
-  // evasive traces -> histogram
-  await page.locator('#pool-revoked').click()
-  await page.locator('#peek-probe').click()
-  await expect(page.locator('#peek-box .verdict-card')).toBeVisible()
-  await page.locator('#run-collusion').click()
-  await expect(page.locator('#collusion-app .hist-row').first()).toBeVisible({ timeout: 60_000 })
-
-  // reveal all progressive-disclosure content
-  await page.evaluate(() => {
-    document.querySelectorAll('details').forEach((d) => {
-      d.open = true
-    })
+  test(`no WCAG A/AA violations in ${theme} theme at 380px`, async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name !== 'chromium', 'the a11y gate sets its own viewports')
+    test.setTimeout(1_800_000)
+    const errors = watchPageErrors(page)
+    await boot(page, theme, NARROW)
+    await driveAllStates(page, `${theme} @380px`)
+    expect(errors, errors.join('\n')).toEqual([])
+    expectBaselineNotStale()
+    reportCollected()
   })
-  await page.waitForTimeout(300)
 }
-
-async function scan(page: Page): Promise<void> {
-  const { violations } = await new AxeBuilder({ page }).withTags(TAGS).analyze()
-  expect(
-    violations.map((v) => ({
-      id: v.id,
-      impact: v.impact,
-      nodes: v.nodes.map((n) => n.target.join(' ')).slice(0, 5),
-    })),
-  ).toEqual([])
-}
-
-test('no WCAG A/AA violations — dark theme', async ({ page }) => {
-  await page.goto('.')
-  await driveDemos(page)
-  await scan(page)
-})
-
-test('no WCAG A/AA violations — light theme', async ({ page }) => {
-  await page.goto('.')
-  await page.locator('#cl-theme-toggle').click()
-  await expect(page.locator('html')).toHaveAttribute('data-theme', 'light')
-  await driveDemos(page)
-  await scan(page)
-})
