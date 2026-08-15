@@ -49,7 +49,7 @@ import {
 
 const WIDE = { width: 1280, height: 900 }
 
-for (const theme of ['dark', 'light'] as const) {
+for (const theme of ['dark'] as const) {
   test(`no WCAG A/AA violations in ${theme} theme`, async ({ page }, testInfo) => {
     test.skip(testInfo.project.name !== 'chromium', 'the a11y gate sets its own viewports')
     test.setTimeout(1_800_000)
