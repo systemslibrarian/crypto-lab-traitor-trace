@@ -272,6 +272,26 @@ fieldset legend {
   text-transform: uppercase;
   color: var(--text-dim);
 }
+/* The value half carries `hexShort()` digests — 13 characters with no break
+   opportunity in them. A flex item's default `min-width: auto` floors it at
+   that token's width, so the row pushed the DOCUMENT sideways rather than
+   wrapping. Let it shrink, and let a digest break inside itself if it must. */
+.result-line > span:not(.result-label) {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+/* Below 640px the rigid 11.5rem label column leaves the value about 90px —
+   narrower than one digest — so stack the pair instead of squeezing it. */
+@media (max-width: 640px) {
+  .result-line {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.1rem;
+  }
+  .result-label {
+    flex: 0 0 auto;
+  }
+}
 .status-ok {
   color: var(--ok);
   font-weight: 600;
