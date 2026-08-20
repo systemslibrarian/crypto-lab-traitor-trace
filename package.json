@@ -19,7 +19,7 @@
     "check:budget": "node scripts/check-budget.mjs"
   },
   "devDependencies": {
-    "@axe-core/playwright": "^4.12.1",
+    "@axe-core/playwright": "^4.13.0",
     "@playwright/test": "^1.62.1",
     "@vitest/coverage-v8": "^4.1.10",
     "typescript": "~7.0.2",
