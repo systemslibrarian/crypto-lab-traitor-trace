@@ -1,8 +1,10 @@
 import { defineConfig, devices } from '@playwright/test'
 
-// Firefox/WebKit run only when ALL_BROWSERS is set (the CI workflow sets it
-// and installs all browsers). The deploy workflow installs Chromium only, so
-// the default project set must stay Chromium-based.
+// Firefox/WebKit run only when ALL_BROWSERS is set. Both workflows set it and
+// install all browsers: ci.yml on pull_request, deploy.yml on push to main and
+// on the dispatch after a Dependabot merge. The default project set stays
+// Chromium-based for local runs, where a four-engine sweep is rarely what you
+// want -- but nothing publishes on that default any more.
 const allBrowsers = !!process.env.ALL_BROWSERS
 
 export default defineConfig({
