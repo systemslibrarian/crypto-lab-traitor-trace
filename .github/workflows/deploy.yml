@@ -28,10 +28,23 @@ jobs:
         run: npm test
       - name: Build (typecheck gates the build)
         run: npm run build
-      - name: Install Playwright browser
-        run: npx playwright install --with-deps chromium
-      - name: Accessibility gate (axe-core, WCAG A/AA, both themes)
+      # All four engines, not Chromium alone. The firefox and webkit projects in
+      # playwright.config.ts are behind ALL_BROWSERS, and until now only ci.yml
+      # set it -- which runs on pull_request. So a push to main, and the deploy
+      # dispatched after a Dependabot merge, were gated on Chromium and mobile
+      # Chromium only, and nothing in the publishing path ever ran the two
+      # engines whose WebCrypto throughput differs most from Chromium's. This
+      # lab's own config notes that difference as ~4x.
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps
+      # axe itself stays Chromium-only -- e2e/a11y.spec.ts skips the other
+      # projects because the a11y gate sets its own viewports. What firefox and
+      # webkit add here is the behaviour suite: the exhibit assertions that
+      # depend on real WebCrypto throughput.
+      - name: Browser gate (axe WCAG A/AA in chromium, behaviour in all four engines)
         run: npm run test:a11y
+        env:
+          ALL_BROWSERS: '1'
       - uses: actions/configure-pages@v6
       - uses: actions/upload-pages-artifact@v5
         with:
