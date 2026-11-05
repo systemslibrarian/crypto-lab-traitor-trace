@@ -6,6 +6,7 @@
  */
 
 import { encryptBroadcast } from '../core/broadcast'
+import { uniformBelow } from '../core/uniform'
 import { makeProbe, pirateDecode, traceTraitor, makeXorshift, type Strategy } from '../core/trace'
 import { N } from '../core/tree'
 import { el, resultLine, subLabel, verdictCard, clear } from './dom'
@@ -65,7 +66,7 @@ export async function initCollusionPanel(lab: Lab, mount: HTMLElement): Promise<
     inputmode: 'numeric',
   }) as HTMLInputElement
   seedInput.value = String(
-    Number.isInteger(urlSeed) && urlSeed > 0 ? urlSeed : 1 + (crypto.getRandomValues(new Uint32Array(1))[0] % 999_999),
+    Number.isInteger(urlSeed) && urlSeed > 0 ? urlSeed : 1 + uniformBelow(999_999),
   )
   const stratSet = el('fieldset', {}, [el('legend', { text: 'Decoder strategy' })])
   for (const [value, label] of [

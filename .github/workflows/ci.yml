@@ -4,6 +4,14 @@ on:
   pull_request:
   workflow_dispatch:
 
+# Least privilege by default: the gate job only reads the repository. The
+# dependabot-auto-merge job below declares the writes it actually needs, and nothing
+# else inherits them. CodeQL named the gap -- actions/missing-workflow-permissions,
+# .github/workflows/ci.yml:9, 2026-10-28 -- and with no block at all the GITHUB_TOKEN
+# arrived with whatever the repository default grants.
+permissions:
+  contents: read
+
 jobs:
   checks:
     runs-on: ubuntu-latest
