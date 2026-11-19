@@ -1,0 +1,46 @@
+name: Gate
+
+# ONE definition of this lab's gate, called by the workflow a Dependabot bump
+# must clear and by the workflow that publishes. `needs:` cannot cross files,
+# so before this the deploy carried its own copy and nothing held the two
+# equal -- in this lab they had already drifted apart.
+#
+# A separate file rather than `workflow_call` on the CI workflow, because that
+# file's dependabot-auto-merge job holds contents: write, pull-requests: write
+# and actions: write, and a called workflow may not hold permissions above its
+# CALLER. Calling it from a deploy that holds contents: read fails the run at
+# startup before any job exists (measured: crypto-lab-key-exchange run
+# 44528331135, conclusion startup_failure).
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node: [22, 24]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+      - run: npm ci
+      - name: Unit tests + coverage thresholds (src/core)
+        run: npm run test:coverage
+      - name: Build (typecheck gates the build)
+        run: npm run build
+      - name: Bundle-size budget
+        run: npm run check:budget
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps
+      - name: Browser gates — behavior + axe a11y, both themes, chromium/firefox/webkit + mobile
+        run: npm run test:a11y
+        env:
+          ALL_BROWSERS: '1'
